@@ -1330,7 +1330,7 @@ contract SoulBoundMedal is ERC721, Ownable, ISoulBoundMedalQueryable {
     }
 
     function _baseURI() internal pure override returns (string memory) {
-        return "https://polkacity.app/nftassets/";
+        return "ipfs://xxxx/";
     }
 
     /**
@@ -1340,7 +1340,7 @@ contract SoulBoundMedal is ERC721, Ownable, ISoulBoundMedalQueryable {
     function addMedals(string[] calldata medals) public override onlyOwner {
         // demo do not need check duplicate
         // demo do not need check `"` in medals
-        for (uint i = 0; i < medals.length; i++) {
+        for (uint256 i = 0; i < medals.length; i++) {
             _medals.push(medals[i]);
         }
     }
@@ -1402,7 +1402,7 @@ contract SoulBoundMedal is ERC721, Ownable, ISoulBoundMedalQueryable {
     {
         string memory result = '{"medals":[';
         // each medals
-        for (uint i = 0; i < _medals.length; i++) {
+        for (uint256 i = 0; i < _medals.length; i++) {
             if (i > 0) {
                 result = stringConcat(result, ",");
             }
@@ -1412,7 +1412,7 @@ contract SoulBoundMedal is ERC721, Ownable, ISoulBoundMedalQueryable {
             result = stringConcat(result, '],"contributors":[]}');
         } else {
             result = stringConcat(result, '],"contributors":[');
-            for (uint i = offset; i < offset + limit; i++) {
+            for (uint256 i = offset; i < offset + limit; i++) {
                 if (i >= contributors.length) {
                     break;
                 }
@@ -1553,32 +1553,31 @@ contract SoulBoundMedal is ERC721, Ownable, ISoulBoundMedalQueryable {
             super.supportsInterface(interfaceId);
     }
 
+    modifier SoulBoundRevert() {
+        revert("SoulBound token cannot be transferred.");
+        _;
+    }
+
     function transferFrom(
         address from,
         address to,
         uint256 tokenId
-    ) public override(IERC721, ERC721) {
-        revert("SoulBound token cannot be transferred.");
-    }
+    ) public override(IERC721, ERC721) SoulBoundRevert {}
 
     function safeTransferFrom(
         address from,
         address to,
         uint256 tokenId
-    ) public override(IERC721, ERC721) {
-        revert("SoulBound token cannot be transferred.");
-    }
+    ) public override(IERC721, ERC721) SoulBoundRevert {}
 
     function safeTransferFrom(
         address from,
         address to,
         uint256 tokenId,
         bytes memory _data
-    ) public override(IERC721, ERC721) {
-        revert("SoulBound token cannot be transferred.");
-    }
+    ) public override(IERC721, ERC721) SoulBoundRevert {}
 
-    function renounceOwnership() public override(Ownable) {
+    function renounceOwnership() public pure override(Ownable) {
         revert("renounce ownership is not allowed");
     }
 }
