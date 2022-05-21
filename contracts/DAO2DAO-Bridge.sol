@@ -24,7 +24,6 @@ interface IERC165 {
     function supportsInterface(bytes4 interfaceId) external view returns (bool);
 }
 
-
 // OpenZeppelin Contracts (last updated v4.6.0) (token/ERC721/IERC721.sol)
 /**
  * @dev Required interface of an ERC721 compliant contract.
@@ -181,7 +180,6 @@ interface IERC721 is IERC165 {
         returns (bool);
 }
 
-
 // OpenZeppelin Contracts v4.4.1 (utils/Context.sol)
 /**
  * @dev Provides information about the current execution context, including the
@@ -202,7 +200,6 @@ abstract contract Context {
         return msg.data;
     }
 }
-
 
 // OpenZeppelin Contracts v4.4.1 (access/Ownable.sol)
 /**
@@ -280,9 +277,6 @@ abstract contract Ownable is Context {
         emit OwnershipTransferred(oldOwner, newOwner);
     }
 }
-
-
-
 
 interface ISoulBoundMedal is IERC721 {
     /**
@@ -375,6 +369,13 @@ contract DAO2DAOMedal is Ownable, IDAO2DAOMedal {
         );
     }
 
+    /**
+     * @dev link currentDAO to remoteDAO
+     * @param remoteDAO address of the remote DAO
+     * @param currentDAO address of the current DAO
+     * @param medalMap_from remote DAO medals
+     * @param medalMap_to current DAO medals
+     */
     function linkDAO(
         address remoteDAO,
         address currentDAO,
@@ -402,6 +403,11 @@ contract DAO2DAOMedal is Ownable, IDAO2DAOMedal {
         }
     }
 
+    /*
+     * @dev unlink currentDAO & remoteDAO
+     * @param remoteDAO address of the remote DAO
+     * @param currentDAO address of the current DAO
+     */
     function unlinkDAO(address remoteDAO, address currentDAO) public override {
         requireDAOContractOwner(currentDAO);
         uint256 index = _linkRemoteIndexMap[currentDAO][remoteDAO];
@@ -413,6 +419,12 @@ contract DAO2DAOMedal is Ownable, IDAO2DAOMedal {
         }
     }
 
+    /**
+     * @dev Check if an address has been awarded a medal in other DAOs
+     * @param currentDAO address of the current DAO
+     * @param contributor address of the contributor
+     * @return true if has been awarded in other DAOs
+     */
     function medalCrossVerify(
         address currentDAO,
         address contributor,
