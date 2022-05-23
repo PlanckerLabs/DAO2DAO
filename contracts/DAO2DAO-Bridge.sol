@@ -278,12 +278,110 @@ abstract contract Ownable is Context {
     }
 }
 
+// OpenZeppelin Contracts v4.4.1 (utils/Strings.sol)
+/**
+ * @dev String operations.
+ */
+library Strings {
+    bytes16 private constant _HEX_SYMBOLS = "0123456789abcdef";
+
+    /**
+     * @dev Converts a `uint256` to its ASCII `string` decimal representation.
+     */
+    function toString(uint256 value) internal pure returns (string memory) {
+        // Inspired by OraclizeAPI's implementation - MIT licence
+        // https://github.com/oraclize/ethereum-api/blob/b42146b063c7d6ee1358846c198246239e9360e8/oraclizeAPI_0.4.25.sol
+
+        if (value == 0) {
+            return "0";
+        }
+        uint256 temp = value;
+        uint256 digits;
+        while (temp != 0) {
+            digits++;
+            temp /= 10;
+        }
+        bytes memory buffer = new bytes(digits);
+        while (value != 0) {
+            digits -= 1;
+            buffer[digits] = bytes1(uint8(48 + uint256(value % 10)));
+            value /= 10;
+        }
+        return string(buffer);
+    }
+
+    /**
+     * @dev Converts a `uint256` to its ASCII `string` hexadecimal representation.
+     */
+    function toHexString(uint256 value) internal pure returns (string memory) {
+        if (value == 0) {
+            return "0x00";
+        }
+        uint256 temp = value;
+        uint256 length = 0;
+        while (temp != 0) {
+            length++;
+            temp >>= 8;
+        }
+        return toHexString(value, length);
+    }
+
+    /**
+     * @dev Converts a `uint256` to its ASCII `string` hexadecimal representation with fixed length.
+     */
+    function toHexString(uint256 value, uint256 length)
+        internal
+        pure
+        returns (string memory)
+    {
+        bytes memory buffer = new bytes(2 * length + 2);
+        buffer[0] = "0";
+        buffer[1] = "x";
+        for (uint256 i = 2 * length + 1; i > 1; --i) {
+            buffer[i] = _HEX_SYMBOLS[value & 0xf];
+            value >>= 4;
+        }
+        require(value == 0, "Strings: hex length insufficient");
+        return string(buffer);
+    }
+}
+
 interface ISoulBoundMedal is IERC721 {
+    /**
+     * @dev get logo
+     * @return string RFC 3986 URL of the logo
+     */
+    function getLogoURI() external view returns (string memory);
+
+    /**
+     * @dev update logo URI
+     * @param logoURI RFC 3986 URL of the logo
+     */
+    function setLogoURI(string calldata logoURI) external;
+
+    /**
+     * @dev get description
+     * @return string  description
+     */
+    function getDescription() external view returns (string memory);
+
+    /**
+     * @dev update description
+     * @param description description
+     */
+    function setDescription(string calldata description) external;
+
     /**
      * @dev Add medals to current DAO
      * @param medals array of medals
      */
     function addMedals(string[] calldata medals) external;
+
+    /**
+     * @dev list medals
+     * @return string[] the list of medals
+     */
+    function getMedals() external view returns (string[] memory);
 
     /**
      * @dev A medal for a community contributor
@@ -305,11 +403,17 @@ interface ISoulBoundMedal is IERC721 {
 
     /**
      * @dev Community contributor cliam a medal
+     * Emits a {Transfer} event.
      */
     function cliam(uint8 medal) external;
 }
 
 interface IDAO2DAOMedal {
+    /**
+     * @dev register a new DAO
+     */
+    function register(address _dao) external;
+
     /**
      * @dev link currentDAO to remoteDAO
      * @param remoteDAO address of the remote DAO
@@ -357,16 +461,128 @@ contract DAO2DAOMedal is Ownable, IDAO2DAOMedal {
 
     mapping(address => LinkData[]) _linkMap;
     mapping(address => mapping(address => uint256)) _linkRemoteIndexMap;
+    address[] _registeredDAOs;
+    mapping(address => uint8) _registeredDAOsIndex;
 
     function name() public pure returns (string memory) {
-        return "DAO to DAO Bridge";
+        return "DAO to DAO Bridge DEMO";
     }
 
-    function requireDAOContractOwner(address contractAddress) public view {
+    modifier onlyDAOContractOwner(address _dao) {
         require(
-            msg.sender == IOwnable(contractAddress).owner(),
+            msg.sender == IOwnable(_dao).owner(),
             "Only DAO contract owner can call this function"
         );
+        _;
+    }
+    modifier onlySoulBoundMedalAddress(address _soulBoundMedalAddress) {
+        require(
+            _soulBoundMedalAddress.code.length > 0,
+            "given address is not a valid contract"
+        );
+        require(
+            IERC165(_soulBoundMedalAddress).supportsInterface(
+                type(ISoulBoundMedal).interfaceId
+            ),
+            "given address is not a valid soul bound medal contract"
+        );
+
+        _;
+    }
+
+    /**
+     * @dev register _dao to DAO Bridge
+     */
+    function register(address _dao)
+        public
+        override
+        onlySoulBoundMedalAddress(_dao)
+    {
+        _register(_dao);
+    }
+
+    function _register(address _dao) private {
+        if (_registeredDAOsIndex[_dao] == 0) {
+            _registeredDAOs.push(_dao);
+            _registeredDAOsIndex[_dao] = 1;
+        }
+    }
+
+    /**
+     * @dev list DAO address
+     * @param offset the offset, from 0
+     * @param limit the limit, minimum 1
+     * @return string the list of DAO link status
+     */
+    function listDaos(uint256 offset, uint256 limit)
+        public
+        view
+        returns (string memory)
+    {
+        string memory result = "[";
+        for (
+            uint256 i = offset;
+            i < _registeredDAOs.length && i < offset + limit;
+            i++
+        ) {
+            if (i > offset) {
+                result = string(abi.encodePacked(result, ","));
+            }
+            address dao = _registeredDAOs[i];
+            result = string(
+                abi.encodePacked(
+                    result,
+                    '{"address": "',
+                    Strings.toHexString(uint256(uint160(dao))),
+                    '","link": ['
+                )
+            );
+            for (uint256 j = 0; j < _linkMap[dao].length; j++) {
+                if (j > 0) {
+                    result = string(abi.encodePacked(result, ","));
+                }
+                LinkData memory linkData = _linkMap[dao][j];
+                uint8[] memory medalMap_from = linkData.medalMap_from;
+                uint8[] memory medalMap_to = linkData.medalMap_to;
+                result = string(
+                    abi.encodePacked(
+                        result,
+                        '{"address": "',
+                        Strings.toHexString(
+                            uint256(uint160(linkData.remoteDAO))
+                        ),
+                        '","mapping": [['
+                    )
+                );
+                for (uint256 k = 0; k < medalMap_from.length; k++) {
+                    if (k > 0) {
+                        result = string(abi.encodePacked(result, ","));
+                    }
+                    result = string(
+                        abi.encodePacked(
+                            result,
+                            Strings.toString(uint256(medalMap_from[k]))
+                        )
+                    );
+                }
+                result = string(abi.encodePacked(result, "],["));
+                for (uint256 k = 0; k < medalMap_to.length; k++) {
+                    if (k > 0) {
+                        result = string(abi.encodePacked(result, ","));
+                    }
+                    result = string(
+                        abi.encodePacked(
+                            result,
+                            Strings.toString(uint256(medalMap_to[k]))
+                        )
+                    );
+                }
+                result = string(abi.encodePacked(result, "]]}"));
+            }
+            result = string(abi.encodePacked(result, "]}"));
+        }
+
+        return string(abi.encodePacked(result, "]"));
     }
 
     /**
@@ -381,13 +597,18 @@ contract DAO2DAOMedal is Ownable, IDAO2DAOMedal {
         address currentDAO,
         uint8[] calldata medalMap_from,
         uint8[] calldata medalMap_to
-    ) public override {
+    )
+        public
+        override
+        onlyDAOContractOwner(currentDAO)
+        onlySoulBoundMedalAddress(currentDAO)
+        onlySoulBoundMedalAddress(remoteDAO)
+    {
         require(
             medalMap_from.length == medalMap_to.length &&
                 medalMap_from.length > 0,
             "medalMap_from and medalMap_to must have same length"
         );
-        requireDAOContractOwner(currentDAO);
         uint256 index = _linkRemoteIndexMap[currentDAO][remoteDAO];
         if (index > 0) {
             _linkMap[currentDAO][index - 1].medalMap_from = medalMap_from;
@@ -401,6 +622,8 @@ contract DAO2DAOMedal is Ownable, IDAO2DAOMedal {
             _linkRemoteIndexMap[currentDAO][remoteDAO] = _linkMap[currentDAO]
                 .length; // minimum index is 1
         }
+        _register(remoteDAO);
+        _register(currentDAO);
     }
 
     /*
@@ -408,8 +631,13 @@ contract DAO2DAOMedal is Ownable, IDAO2DAOMedal {
      * @param remoteDAO address of the remote DAO
      * @param currentDAO address of the current DAO
      */
-    function unlinkDAO(address remoteDAO, address currentDAO) public override {
-        requireDAOContractOwner(currentDAO);
+    function unlinkDAO(address remoteDAO, address currentDAO)
+        public
+        override
+        onlyDAOContractOwner(currentDAO)
+        onlySoulBoundMedalAddress(currentDAO)
+        onlySoulBoundMedalAddress(remoteDAO)
+    {
         uint256 index = _linkRemoteIndexMap[currentDAO][remoteDAO];
         if (index > 0) {
             delete _linkMap[currentDAO][index - 1];

@@ -1242,10 +1242,40 @@ library Counters {
 
 interface ISoulBoundMedal is IERC721 {
     /**
+     * @dev get logo
+     * @return string RFC 3986 URL of the logo
+     */
+    function getLogoURI() external view returns (string memory);
+
+    /**
+     * @dev update logo URI
+     * @param logoURI RFC 3986 URL of the logo
+     */
+    function setLogoURI(string calldata logoURI) external;
+
+    /**
+     * @dev get description
+     * @return string  description
+     */
+    function getDescription() external view returns (string memory);
+
+    /**
+     * @dev update description
+     * @param description description
+     */
+    function setDescription(string calldata description) external;
+
+    /**
      * @dev Add medals to current DAO
      * @param medals array of medals
      */
     function addMedals(string[] calldata medals) external;
+
+    /**
+     * @dev list medals
+     * @return string[] the list of medals
+     */
+    function getMedals() external view returns (string[] memory);
 
     /**
      * @dev A medal for a community contributor
@@ -1273,12 +1303,6 @@ interface ISoulBoundMedal is IERC721 {
 }
 
 interface ISoulBoundMedalQueryable is ISoulBoundMedal {
-    /**
-     * @dev list medals
-     * @return string[] the list of medals
-     */
-    function getMedals() external view returns (string[] memory);
-
     /**
      * @dev friendly qeruy
      * @param offset the offset, from 0
@@ -1309,7 +1333,21 @@ contract SoulBoundMedal is ERC721, Ownable, ISoulBoundMedalQueryable {
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIdCounter;
 
-    constructor() ERC721("SoulBound Medal", "SOULBOUNDMEDAL") {}
+    constructor(
+        string memory _name,
+        string memory _symbol,
+        address _bridge,
+        string memory _logo,
+        string memory _description,
+        string memory _uriPrefix
+    ) ERC721(_name, _symbol) {
+        _dao2daoBridge = _bridge;
+        _baseUri = _uriPrefix;
+        _logouri = _logo;
+        _descriptiontxt = _description;
+    }
+
+    string _baseUri;
 
     // Mapping from token ID to medal
     mapping(uint256 => uint8) private _medalMap;
@@ -1320,6 +1358,8 @@ contract SoulBoundMedal is ERC721, Ownable, ISoulBoundMedalQueryable {
     address[] private contributors;
     mapping(address => uint8) private _contributorsMap;
     address private _dao2daoBridge;
+    string private _logouri;
+    string private _descriptiontxt;
 
     function setDao2daoBridge(address dao2daoBridgeContract) public onlyOwner {
         _dao2daoBridge = dao2daoBridgeContract;
@@ -1329,8 +1369,44 @@ contract SoulBoundMedal is ERC721, Ownable, ISoulBoundMedalQueryable {
         return _dao2daoBridge;
     }
 
-    function _baseURI() internal pure override returns (string memory) {
-        return "ipfs://xxxx/";
+    function _baseURI() internal view override returns (string memory) {
+        return _baseUri;
+    }
+
+    /**
+     * @dev get logo
+     * @return string RFC 3986 URL of the logo
+     */
+    function getLogoURI() public view override returns (string memory) {
+        return _logouri;
+    }
+
+    /**
+     * @dev update logo URI
+     * @param logoURI RFC 3986 URL of the logo
+     */
+    function setLogoURI(string calldata logoURI) public override onlyOwner {
+        _logouri = logoURI;
+    }
+
+    /**
+     * @dev get description
+     * @return string  description
+     */
+    function getDescription() public view override returns (string memory) {
+        return _descriptiontxt;
+    }
+
+    /**
+     * @dev update description
+     * @param description description
+     */
+    function setDescription(string calldata description)
+        public
+        override
+        onlyOwner
+    {
+        _descriptiontxt = description;
     }
 
     /**
@@ -1338,9 +1414,15 @@ contract SoulBoundMedal is ERC721, Ownable, ISoulBoundMedalQueryable {
      * @param medals array of medals
      */
     function addMedals(string[] calldata medals) public override onlyOwner {
-        // demo do not need check duplicate
-        // demo do not need check `"` in medals
+        // demo not check if RFC 3986 URI
         for (uint256 i = 0; i < medals.length; i++) {
+            for (uint256 j = 0; j < _medals.length; j++) {
+                require(
+                    keccak256(abi.encodePacked(_medals[j])) !=
+                        keccak256(abi.encodePacked(medals[i])),
+                    "Medal already exists"
+                );
+            }
             _medals.push(medals[i]);
         }
     }
@@ -1351,41 +1433,6 @@ contract SoulBoundMedal is ERC721, Ownable, ISoulBoundMedalQueryable {
      */
     function getMedals() public view override returns (string[] memory) {
         return _medals;
-    }
-
-    function stringConcat(string memory a, string memory b)
-        private
-        pure
-        returns (string memory)
-    {
-        return string(abi.encodePacked(a, b));
-    }
-
-    function stringConcat(
-        string memory a,
-        string memory b,
-        string memory c
-    ) private pure returns (string memory) {
-        return string(abi.encodePacked(a, b, c));
-    }
-
-    function stringConcat(
-        string memory a,
-        string memory b,
-        string memory c,
-        string memory d
-    ) private pure returns (string memory) {
-        return string(abi.encodePacked(a, b, c, d));
-    }
-
-    function stringConcat(
-        string memory a,
-        string memory b,
-        string memory c,
-        string memory d,
-        string memory e
-    ) private pure returns (string memory) {
-        return string(abi.encodePacked(a, b, c, d, e));
     }
 
     /**
@@ -1404,51 +1451,59 @@ contract SoulBoundMedal is ERC721, Ownable, ISoulBoundMedalQueryable {
         // each medals
         for (uint256 i = 0; i < _medals.length; i++) {
             if (i > 0) {
-                result = stringConcat(result, ",");
+                result = string(abi.encodePacked(result, ","));
             }
-            result = stringConcat(result, '"', _baseURI(), _medals[i], '"');
+            result = string(
+                abi.encodePacked(result, '"', _baseURI(), _medals[i], '"')
+            );
         }
         if (offset > contributors.length) {
-            result = stringConcat(result, '],"contributors":[]}');
+            result = string(abi.encodePacked(result, '],"contributors":[]}'));
         } else {
-            result = stringConcat(result, '],"contributors":[');
+            result = string(abi.encodePacked(result, '],"contributors":['));
             for (uint256 i = offset; i < offset + limit; i++) {
                 if (i >= contributors.length) {
                     break;
                 }
                 address contributor = contributors[i];
                 if (i > offset) {
-                    result = stringConcat(result, ",");
+                    result = string(abi.encodePacked(result, ","));
                 }
-                result = stringConcat(result, '{"address":"');
-                result = stringConcat(
-                    result,
-                    Strings.toHexString(uint256(uint160(contributor)))
+                result = string(
+                    abi.encodePacked(
+                        result,
+                        '{"address":"',
+                        Strings.toHexString(uint256(uint160(contributor))),
+                        '","medals":['
+                    )
                 );
-                result = stringConcat(result, '","medals":[');
                 bool _first = true;
                 for (uint8 j = 0; j < _medals.length; j++) {
                     uint8 cliamStatus = _awardMap[contributor][j];
                     if (cliamStatus > 0) {
                         if (!_first) {
-                            result = stringConcat(result, ",");
+                            result = string(abi.encodePacked(result, ","));
                         } else {
                             _first = false;
                         }
-                        result = stringConcat(result, '{"medalsindex":');
-                        result = stringConcat(result, Strings.toString(j));
-                        //,"claimed":false}
-                        result = stringConcat(result, ',"claimed":');
+                        result = string(
+                            abi.encodePacked(
+                                result,
+                                '{"medalsindex":',
+                                Strings.toString(j),
+                                ',"claimed":'
+                            )
+                        );
                         if (cliamStatus == 1) {
-                            result = stringConcat(result, "true}");
+                            result = string(abi.encodePacked(result, "true}"));
                         } else {
-                            result = stringConcat(result, "false}");
+                            result = string(abi.encodePacked(result, "false}"));
                         }
                     }
                 }
-                result = stringConcat(result, "]}");
+                result = string(abi.encodePacked(result, "]}"));
             }
-            result = stringConcat(result, "]}");
+            result = string(abi.encodePacked(result, "]}"));
         }
         return result;
     }
@@ -1538,7 +1593,15 @@ contract SoulBoundMedal is ERC721, Ownable, ISoulBoundMedalQueryable {
         );
         string memory baseURI = _baseURI();
         string memory medalSuffox = _medals[_medalMap[tokenId]];
-        return stringConcat(baseURI, medalSuffox);
+        return
+            string(
+                abi.encodePacked(
+                    baseURI,
+                    medalSuffox,
+                    "?tokenid=",
+                    Strings.toString(tokenId)
+                )
+            );
     }
 
     function supportsInterface(bytes4 interfaceId)

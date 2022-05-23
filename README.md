@@ -3,7 +3,7 @@
 - [contracts](contracts) All contracts
     - [DAO2DAO-Bridge.sol](contracts/DAO2DAO-Bridge.sol)
 
-    A proof-of-honor bridge between a DAO community
+    A proof-of-honor bridge between DAO community
 
     - [SoulBound-Template.sol](contracts/SoulBound-Template.sol)
 
