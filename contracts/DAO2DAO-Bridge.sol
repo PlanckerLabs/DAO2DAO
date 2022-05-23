@@ -346,7 +346,15 @@ library Strings {
     }
 }
 
-interface ISoulBoundMedal is IERC721 {
+interface ISoulBound is IERC721 {
+    /**
+     * @dev if the token is soulbound
+     * @return true if the token is soulbound
+     */
+    function soulbound() external view returns (bool);
+}
+
+interface ISoulBoundMedal is ISoulBound {
     /**
      * @dev get logo
      * @return string RFC 3986 URL of the logo

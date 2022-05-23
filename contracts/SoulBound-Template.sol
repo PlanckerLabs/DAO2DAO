@@ -1240,7 +1240,15 @@ library Counters {
     }
 }
 
-interface ISoulBoundMedal is IERC721 {
+interface ISoulBound is IERC721 {
+    /**
+     * @dev if the token is soulbound
+     * @return true if the token is soulbound
+     */
+    function soulbound() external view returns (bool);
+}
+
+interface ISoulBoundMedal is ISoulBound {
     /**
      * @dev get logo
      * @return string RFC 3986 URL of the logo
@@ -1337,6 +1345,7 @@ contract SoulBoundMedal is ERC721, Ownable, ISoulBoundMedalQueryable {
         string memory _name,
         string memory _symbol,
         address _bridge,
+        string[] memory _medal,
         string memory _logo,
         string memory _description,
         string memory _uriPrefix
@@ -1345,6 +1354,7 @@ contract SoulBoundMedal is ERC721, Ownable, ISoulBoundMedalQueryable {
         _baseUri = _uriPrefix;
         _logouri = _logo;
         _descriptiontxt = _description;
+        addMedals(_medal);
     }
 
     string _baseUri;
@@ -1355,6 +1365,7 @@ contract SoulBoundMedal is ERC721, Ownable, ISoulBoundMedalQueryable {
     mapping(address => mapping(uint8 => uint8)) private _awardMap;
 
     string[] private _medals;
+    mapping(bytes32 => uint8) private _medalExistMap;
     address[] private contributors;
     mapping(address => uint8) private _contributorsMap;
     address private _dao2daoBridge;
@@ -1371,6 +1382,14 @@ contract SoulBoundMedal is ERC721, Ownable, ISoulBoundMedalQueryable {
 
     function _baseURI() internal view override returns (string memory) {
         return _baseUri;
+    }
+
+    /**
+     * @dev if the token is soulbound
+     * @return true if the token is soulbound
+     */
+    function soulbound() public pure override returns (bool) {
+        return true;
     }
 
     /**
@@ -1413,17 +1432,15 @@ contract SoulBoundMedal is ERC721, Ownable, ISoulBoundMedalQueryable {
      * @dev Add medals to current DAO
      * @param medals array of medals
      */
-    function addMedals(string[] calldata medals) public override onlyOwner {
+    function addMedals(string[] memory medals) public override onlyOwner {
         // demo not check if RFC 3986 URI
         for (uint256 i = 0; i < medals.length; i++) {
-            for (uint256 j = 0; j < _medals.length; j++) {
-                require(
-                    keccak256(abi.encodePacked(_medals[j])) !=
-                        keccak256(abi.encodePacked(medals[i])),
-                    "Medal already exists"
-                );
+            string memory medal = medals[i];
+            bytes32 medalbytes = keccak256(abi.encodePacked(medal));
+            if (_medalExistMap[medalbytes] == 0) {
+                _medals.push(medal);
+                _medalExistMap[medalbytes] = 1;
             }
-            _medals.push(medals[i]);
         }
     }
 
@@ -1611,12 +1628,13 @@ contract SoulBoundMedal is ERC721, Ownable, ISoulBoundMedalQueryable {
         returns (bool)
     {
         return
+            interfaceId == type(ISoulBound).interfaceId ||
             interfaceId == type(ISoulBoundMedal).interfaceId ||
             interfaceId == type(ISoulBoundMedalQueryable).interfaceId ||
             super.supportsInterface(interfaceId);
     }
 
-    modifier SoulBoundRevert() {
+    modifier SoulBoundToken() {
         revert("SoulBound token cannot be transferred.");
         _;
     }
@@ -1625,20 +1643,20 @@ contract SoulBoundMedal is ERC721, Ownable, ISoulBoundMedalQueryable {
         address from,
         address to,
         uint256 tokenId
-    ) public override(IERC721, ERC721) SoulBoundRevert {}
+    ) public override(IERC721, ERC721) SoulBoundToken {}
 
     function safeTransferFrom(
         address from,
         address to,
         uint256 tokenId
-    ) public override(IERC721, ERC721) SoulBoundRevert {}
+    ) public override(IERC721, ERC721) SoulBoundToken {}
 
     function safeTransferFrom(
         address from,
         address to,
         uint256 tokenId,
         bytes memory _data
-    ) public override(IERC721, ERC721) SoulBoundRevert {}
+    ) public override(IERC721, ERC721) SoulBoundToken {}
 
     function renounceOwnership() public pure override(Ownable) {
         revert("renounce ownership is not allowed");
